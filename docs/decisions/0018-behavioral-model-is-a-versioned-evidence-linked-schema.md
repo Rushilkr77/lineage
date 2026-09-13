@@ -1,4 +1,4 @@
-# 0017 Behavioral Model Is A Versioned, Evidence-Linked Schema
+# 0018 Behavioral Model Is A Versioned, Evidence-Linked Schema
 
 Status: Accepted
 
@@ -31,7 +31,13 @@ behavior validation. This ADR is the second stage.
    `inventory.Inventory` snapshot the model was built from, on top of (not
    instead of) per-citation evidence checks — a signal individual
    `EvidenceRef` comparisons alone cannot give, since those only ever
-   compare one cited file at a time.
+   compare one cited file at a time. Evidence drift, at either level, is a
+   `Validate` **error**, not an informational note: a model whose cited
+   evidence no longer matches the workspace no longer has the support its
+   `Claim`s and `Decision`s claim to have, and treating that as
+   non-blocking would let a compiler build from evidence that has moved
+   out from under it. `report.Passed()` is the one signal a compiler is
+   required to check, and it is false whenever evidence has drifted.
 4. Every field-level assertion is a `Claim` carrying its own `EvidenceRef`s,
    rather than one evidence list shared across a whole step, so which
    evidence supports which specific assertion is never ambiguous — the
@@ -64,6 +70,11 @@ behavior validation. This ADR is the second stage.
 
 ## Follow-Up
 
+- Every consumer of `BehavioralModel` — #104's analysis, #106's
+  compilation — must reject a model whose `Validate` report does not pass
+  rather than proceeding on stale evidence. This is a hard requirement,
+  not a recommendation: `Passed() == false` on evidence drift means "do
+  not compile," full stop.
 - #106 must implement the model-to-manifest mapping as code, not just
   documentation.
 - #104 must resolve or explicitly carry forward every `Decision` before

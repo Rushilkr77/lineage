@@ -28,7 +28,7 @@ author's folders.
    references, plus setup needs and validation gates. Every claim carries its
    own evidence back into the inventory; unresolved or ambiguous behavior
    becomes an explicit `Decision` rather than a guess. See
-   [ADR 0017](../decisions/0017-behavioral-model-is-a-versioned-evidence-linked-schema.md)
+   [ADR 0018](../decisions/0018-behavioral-model-is-a-versioned-evidence-linked-schema.md)
    and the mapping to package concepts below.
 3. **Agent-assisted analysis (#104):** resolve ambiguity that literal matching
    cannot answer, such as an instruction that says “run the deploy script”

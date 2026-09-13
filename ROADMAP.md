@@ -32,7 +32,7 @@ and pull-request state remains the source of truth for individual tasks.
 - A versioned, provider-neutral behavioral model — ordered steps with
   evidence-linked claims for inputs, outputs, skills, tools, and references,
   plus setup needs, validation gates, and explicit unresolved decisions
-  (#103, ADR 0017).
+  (#103, ADR 0018).
 
 ## Now
 

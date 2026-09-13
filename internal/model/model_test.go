@@ -70,27 +70,29 @@ func TestValidateRejectsEmptySteps(t *testing.T) {
 	assertErrorContains(t, report, "no steps")
 }
 
-func TestValidateRejectsDanglingEvidenceDigest(t *testing.T) {
+func TestValidateRejectsStalePerCitationEvidence(t *testing.T) {
 	inv := validInventory()
 	m := validModel(inv)
 	m.Steps[0].Evidence[0].Digest = "sha256:stale"
 
+	// Evidence drift is a compilation blocker: a claim whose cited file
+	// has changed since the model was built no longer has the support it
+	// claims to have, so this must fail Validate, not just note it.
 	report, _ := Validate(m, inv)
-	// Staleness is a Note, not an Error: the file still exists and the
-	// model is still structurally valid, it's just built from an older
-	// snapshot — Passed() should stay true.
-	if !report.Passed() {
-		t.Fatalf("expected Passed() = true (staleness is a Note, not an Error), got errors = %#v", report.Errors)
-	}
-	found := false
-	for _, n := range report.Notes {
-		if strings.Contains(n, "stale") {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatalf("expected a staleness note, got errors=%#v notes=%#v", report.Errors, report.Notes)
-	}
+	assertErrorContains(t, report, "stale")
+}
+
+func TestValidateRejectsStaleSourceInventoryDigest(t *testing.T) {
+	inv := validInventory()
+	m := validModel(inv)
+	m.SourceInventoryDigest = "sha256:stale"
+
+	// Same invariant at the whole-model level: SourceInventoryDigest not
+	// matching the supplied inventory means the model was built from a
+	// different snapshot, which must also block compilation even if every
+	// individual EvidenceRef still happens to resolve.
+	report, _ := Validate(m, inv)
+	assertErrorContains(t, report, "source_inventory_digest")
 }
 
 func TestValidateRejectsEvidenceNotInInventory(t *testing.T) {

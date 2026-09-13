@@ -16,7 +16,14 @@ type ValidateReport struct {
 	Notes  []string
 }
 
-// Passed reports whether the model validated cleanly.
+// Passed reports whether the model validated cleanly. Any compiler
+// consuming a BehavioralModel (#104's analysis, #106's compilation) MUST
+// treat Passed() == false as non-compilable — including when the only
+// Errors present describe evidence drift (a stale or missing digest, at
+// either the whole-inventory or per-citation level). Evidence drift is
+// never reported as a Note: a model whose cited evidence no longer
+// matches the workspace no longer has the support its Claims and
+// Decisions claim to have, so nothing downstream may proceed on it.
 func (r ValidateReport) Passed() bool {
 	return len(r.Errors) == 0
 }
@@ -26,6 +33,8 @@ func (r ValidateReport) Passed() bool {
 // never fails fast except when m itself cannot be examined at all; every
 // other problem becomes an Errors or Notes entry so the report is
 // complete, following packages.Validate's own collect-everything pattern.
+// Evidence drift is always an Errors entry, never a Notes entry — see
+// Passed.
 func Validate(m BehavioralModel, inv inventory.Inventory) (ValidateReport, error) {
 	var report ValidateReport
 
@@ -33,8 +42,15 @@ func Validate(m BehavioralModel, inv inventory.Inventory) (ValidateReport, error
 		report.Errors = append(report.Errors, fmt.Sprintf("model declares schema %d, but this build only understands schema %d", m.Schema, CurrentSchema))
 	}
 
+	// Evidence drift is a compilation blocker, not advice: a model whose
+	// evidence no longer matches the workspace no longer has the support
+	// its Claims and Decisions claim to have, and a compiler that proceeds
+	// anyway would be inventing behavior the current source doesn't
+	// support. Both this whole-snapshot check and the per-EvidenceRef
+	// check in checkEvidence below report drift as Errors so Passed()
+	// reliably gates compilation.
 	if got, want := m.SourceInventoryDigest, computeInventoryDigest(inv); got != want {
-		report.Notes = append(report.Notes, fmt.Sprintf("model's source_inventory_digest (%s) differs from the supplied inventory's digest (%s) — model may have been built against a different inventory snapshot", got, want))
+		report.Errors = append(report.Errors, fmt.Sprintf("model's source_inventory_digest (%s) does not match the supplied inventory's digest (%s): model was built from a different inventory snapshot", got, want))
 	}
 
 	if len(m.Steps) == 0 {
@@ -56,7 +72,7 @@ func Validate(m BehavioralModel, inv inventory.Inventory) (ValidateReport, error
 			case !found:
 				report.Errors = append(report.Errors, fmt.Sprintf("%s: evidence cites %q, which is not in the supplied inventory", context, ref.Path))
 			case entry.Digest != ref.Digest:
-				report.Notes = append(report.Notes, fmt.Sprintf("%s: evidence for %q is stale (digest %s, inventory now has %s)", context, ref.Path, ref.Digest, entry.Digest))
+				report.Errors = append(report.Errors, fmt.Sprintf("%s: evidence for %q is stale (digest %s, inventory now has %s)", context, ref.Path, ref.Digest, entry.Digest))
 			}
 		}
 	}
