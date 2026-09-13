@@ -77,12 +77,30 @@ func Validate(m BehavioralModel, inv inventory.Inventory) (ValidateReport, error
 		}
 	}
 
+	// registerIdentity checks that id (a Step.ID, Claim.Value, SetupNeed.Path,
+	// Gate.ID, or Decision.ID) is non-empty and, only if so, checks it for
+	// duplicates against seen. An empty identity is never registered as a
+	// duplicate candidate: Ref.Key and the other Ref fields are documented
+	// as reusing exactly these values as stable, natural keys, so an empty
+	// one isn't a weak identifier, it's the absence of one. Ref{StepID: ""}
+	// already means "model-level" by design — an empty Step.ID would make a
+	// real step indistinguishable from that, so no Decision could ever
+	// address it and #106 could not map it into a workflow step
+	// deterministically.
+	registerIdentity := func(kind, id string, seen map[string]bool) {
+		if id == "" {
+			report.Errors = append(report.Errors, fmt.Sprintf("%s: identity must not be empty", kind))
+			return
+		}
+		if seen[id] {
+			report.Errors = append(report.Errors, fmt.Sprintf("duplicate %s %q", kind, id))
+		}
+		seen[id] = true
+	}
+
 	stepIDs := make(map[string]bool)
 	for _, step := range m.Steps {
-		if stepIDs[step.ID] {
-			report.Errors = append(report.Errors, fmt.Sprintf("duplicate step id %q", step.ID))
-		}
-		stepIDs[step.ID] = true
+		registerIdentity("step id", step.ID, stepIDs)
 
 		checkEvidence(fmt.Sprintf("step %q", step.ID), step.Evidence)
 
@@ -96,39 +114,27 @@ func Validate(m BehavioralModel, inv inventory.Inventory) (ValidateReport, error
 		for _, field := range stepFieldsWithClaims {
 			seen := make(map[string]bool)
 			for _, claim := range fields[field] {
-				if seen[claim.Value] {
-					report.Errors = append(report.Errors, fmt.Sprintf("step %q: duplicate %s claim %q", step.ID, field, claim.Value))
-				}
-				seen[claim.Value] = true
+				registerIdentity(fmt.Sprintf("step %q %s claim value", step.ID, field), claim.Value, seen)
 				checkEvidence(fmt.Sprintf("step %q %s claim %q", step.ID, field, claim.Value), claim.Evidence)
 			}
 		}
 
 		seenSetup := make(map[string]bool)
 		for _, need := range step.Setup {
-			if seenSetup[need.Path] {
-				report.Errors = append(report.Errors, fmt.Sprintf("step %q: duplicate setup need %q", step.ID, need.Path))
-			}
-			seenSetup[need.Path] = true
+			registerIdentity(fmt.Sprintf("step %q setup need path", step.ID), need.Path, seenSetup)
 			checkEvidence(fmt.Sprintf("step %q setup need %q", step.ID, need.Path), need.Evidence)
 		}
 
 		seenGates := make(map[string]bool)
 		for _, gate := range step.Gates {
-			if seenGates[gate.ID] {
-				report.Errors = append(report.Errors, fmt.Sprintf("step %q: duplicate gate id %q", step.ID, gate.ID))
-			}
-			seenGates[gate.ID] = true
+			registerIdentity(fmt.Sprintf("step %q gate id", step.ID), gate.ID, seenGates)
 			checkEvidence(fmt.Sprintf("step %q gate %q", step.ID, gate.ID), gate.Evidence)
 		}
 	}
 
 	seenDecisions := make(map[string]bool)
 	for _, d := range m.Decisions {
-		if seenDecisions[d.ID] {
-			report.Errors = append(report.Errors, fmt.Sprintf("duplicate decision id %q", d.ID))
-		}
-		seenDecisions[d.ID] = true
+		registerIdentity("decision id", d.ID, seenDecisions)
 
 		checkEvidence(fmt.Sprintf("decision %q", d.ID), d.Evidence)
 

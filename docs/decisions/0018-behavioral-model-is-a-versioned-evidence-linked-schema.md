@@ -46,7 +46,13 @@ behavior validation. This ADR is the second stage.
    exists: `Claim.Value` and `SetupNeed.Path` already are unique within
    their scope, so `Ref.Key` reuses them directly. `Gate` is the one
    exception, needing a real `ID` since its only content field is free
-   prose.
+   prose. Every one of these identity fields — `Step.ID`, `Claim.Value`,
+   `SetupNeed.Path`, `Gate.ID`, `Decision.ID` — must be non-empty.
+   `Validate` rejects an empty one as an error, not just a duplicate: an
+   empty `Step.ID` is indistinguishable from `Ref{StepID: ""}`, which
+   already means model-level by design, so a step with no ID could never
+   be addressed by a `Decision` and #106 could not map it into a
+   `packages.Workflow` step deterministically.
 6. `Decision.Refs` addresses model-level, step-level, field-level, or
    claim-level ambiguity — the same `Ref` type at four granularities —
    rather than forcing every decision to name an exact claim that may not

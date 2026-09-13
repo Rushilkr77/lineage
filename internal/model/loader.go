@@ -15,11 +15,13 @@ import (
 // Nothing in internal/inventory reads a stored inventory back yet — its
 // own doc comment flags this as a gap for "whoever adds the first reader"
 // to close, following packages.LoadManifest's schema-defaulting pattern.
-// This is that first reader: an absent or zero schema field is treated as
+// This is that first reader: an absent schema field is treated as
 // inventory.CurrentSchema (the only schema that ever existed before this
-// reader existed), and any other value is rejected outright rather than
-// silently misparsed, using the same probe-pointer trick LoadManifest uses
-// to tell "field absent" apart from "field explicitly zero".
+// reader existed), while an explicit value — including an explicit zero,
+// which never existed as a real schema — is rejected outright rather than
+// silently coerced. The probe-pointer trick below is what tells "field
+// absent" apart from "field explicitly zero", since both leave the plain
+// int field at its zero value.
 func LoadInventory(path string) (inventory.Inventory, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

@@ -122,6 +122,64 @@ func TestValidateRejectsDuplicateClaimValue(t *testing.T) {
 	assertErrorContains(t, report, "duplicate")
 }
 
+// Identity fields (Step.ID, Claim.Value, SetupNeed.Path, Gate.ID,
+// Decision.ID) are documented as stable, natural keys that Ref reuses
+// directly. An empty one isn't a weak identifier, it's the absence of
+// one — Ref{StepID: ""} already means "model-level" by design, so a real
+// step with an empty ID would be indistinguishable from that and no
+// Decision could ever address it.
+
+func TestValidateRejectsEmptyStepID(t *testing.T) {
+	inv := validInventory()
+	m := validModel(inv)
+	m.Steps[0].ID = ""
+
+	report, _ := Validate(m, inv)
+	assertErrorContains(t, report, "step id: identity must not be empty")
+}
+
+func TestValidateRejectsEmptyClaimValue(t *testing.T) {
+	inv := validInventory()
+	m := validModel(inv)
+	m.Steps[0].Tools[0].Value = ""
+
+	report, _ := Validate(m, inv)
+	assertErrorContains(t, report, "claim value: identity must not be empty")
+}
+
+func TestValidateRejectsEmptySetupNeedPath(t *testing.T) {
+	inv := validInventory()
+	m := validModel(inv)
+	m.Steps[0].Setup = []SetupNeed{
+		{Path: "", Description: "an output directory", Kind: "directory", Evidence: []EvidenceRef{{Path: "CLAUDE.md", Digest: "sha256:aaaa"}}},
+	}
+
+	report, _ := Validate(m, inv)
+	assertErrorContains(t, report, "setup need path: identity must not be empty")
+}
+
+func TestValidateRejectsEmptyGateID(t *testing.T) {
+	inv := validInventory()
+	m := validModel(inv)
+	m.Steps[0].Gates = []Gate{
+		{ID: "", Description: "must pass lint", Evidence: []EvidenceRef{{Path: "CLAUDE.md", Digest: "sha256:aaaa"}}},
+	}
+
+	report, _ := Validate(m, inv)
+	assertErrorContains(t, report, "gate id: identity must not be empty")
+}
+
+func TestValidateRejectsEmptyDecisionID(t *testing.T) {
+	inv := validInventory()
+	m := validModel(inv)
+	m.Decisions = []Decision{
+		{ID: "", Description: "unresolved", Evidence: []EvidenceRef{{Path: "CLAUDE.md", Digest: "sha256:aaaa"}}},
+	}
+
+	report, _ := Validate(m, inv)
+	assertErrorContains(t, report, "decision id: identity must not be empty")
+}
+
 func TestValidateRejectsRefNamingWrongField(t *testing.T) {
 	inv := validInventory()
 	m := validModel(inv)
